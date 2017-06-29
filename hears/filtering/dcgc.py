@@ -1,3 +1,4 @@
+from __future__ import print_function
 from brian import *
 from hears.filtering.filterbank import Filterbank,FunctionFilterbank,ControlFilterbank,CombinedFilterbank,RestructureFilterbank
 from hears.filtering.filterbanklibrary import *
