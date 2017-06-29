@@ -6,7 +6,7 @@ from hears.filtering.filterbanklibrary import *
 __all__ = ['DRNL']
 
 
-def set_parameters(cf, type, param):
+def set_parameters(cf, type, param=None):
     parameters = {'stape_scale': 0.00014
                   , 'order_linear': 3
                   , 'order_nonlinear': 3
@@ -140,7 +140,7 @@ class DRNL(CombinedFilterbank):
       param['lp_nl_cutoff_m']=1.016   
     """
 
-    def __init__(self, source, cf, type='human', param={}):
+    def __init__(self, source, cf, type='human', param=None):
         CombinedFilterbank.__init__(self, source)
         source = self.get_modified_source()
 
