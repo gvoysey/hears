@@ -145,7 +145,6 @@ class DRNL(CombinedFilterbank):
         source = self.get_modified_source()
 
         cf = atleast_1d(cf)
-        nbr_cf = len(cf)
         parameters = set_parameters(cf, type, param)
 
         # conversion to stape velocity (which are the units needed for the further centres)
@@ -162,7 +161,6 @@ class DRNL(CombinedFilterbank):
         gain = FunctionFilterbank(gammatone, func_gain)
         # low pass filter(cascade of 4 second order lowpass butterworth filters)
         cutoff_frequencies_linear = 10 ** (parameters['lp_lin_cutoff_p0'] + parameters['lp_lin_cutoff_m'] * log10(cf))
-        order_lowpass_linear = 2
         lp_l = LowPass(gain, cutoff_frequencies_linear)
         lowpass_linear = Cascade(gain, lp_l, 4)
 
@@ -183,7 +181,6 @@ class DRNL(CombinedFilterbank):
                                                    order=parameters['order_nonlinear'])
         # low pass filter
         cutoff_frequencies_nonlinear = 10 ** (parameters['lp_nl_cutoff_p0'] + parameters['lp_nl_cutoff_m'] * log10(cf))
-        order_lowpass_nonlinear = 2
         lp_nl = LowPass(bandpass_nonlinear2, cutoff_frequencies_nonlinear)
         lowpass_nonlinear = Cascade(bandpass_nonlinear2, lp_nl, 3)
         # adding the two pathways
@@ -193,7 +190,7 @@ class DRNL(CombinedFilterbank):
 
 
 if __name__ == '__main__':
-
+    pass
     #
     # set_global_preferences(usenewbrianhears=True,
     #                        useweave=False)
