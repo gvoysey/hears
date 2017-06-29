@@ -1,6 +1,6 @@
 from brian import *
-from filterbank import *
-from firfilterbank import *
+from hears.filtering.filterbank import *
+from hears.filtering.firfilterbank import *
 
 __all__ = ['FractionalDelay']
 

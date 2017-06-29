@@ -5,9 +5,9 @@ except ImportError:
     from scipy import weave
 from scipy import signal, random
 from operator import isSequenceType
-from filterbank import Filterbank,RestructureFilterbank
-from linearfilterbank import *
-from firfilterbank import *
+from hears.filtering.filterbank import Filterbank,RestructureFilterbank
+from hears.filtering.linearfilterbank import *
+from hears.filtering.firfilterbank import *
 __all__ = ['Cascade',
            'Gammatone',
            'ApproximateGammatone',

@@ -6,8 +6,8 @@ previous inputs. For the moment, we implement it as a special case of
 LinearFilterbank but later this will change to using the FFT method.
 '''
 from brian import *
-from filterbank import *
-from linearfilterbank import *
+from hears.filtering.filterbank import *
+from hears.filtering.linearfilterbank import *
 
 __all__ = ['FIRFilterbank', 'LinearFIRFilterbank', 'FFTFIRFilterbank']
 

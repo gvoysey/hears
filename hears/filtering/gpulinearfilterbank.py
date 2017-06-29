@@ -9,8 +9,8 @@ import pycuda.compiler
 from pycuda import gpuarray
 from brian.experimental.cuda.buffering import *
 import re
-from filterbank import Filterbank, RestructureFilterbank
-from gputools import *
+from hears.filtering.filterbank import Filterbank, RestructureFilterbank
+from hears.filtering.gputools import *
 import gc
 
 __all__ = ['LinearFilterbank']

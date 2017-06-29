@@ -1,10 +1,10 @@
 from brian import *
-from filterbank import Filterbank,FunctionFilterbank,ControlFilterbank, CombinedFilterbank
-from filterbanklibrary import *
-from linearfilterbank import *
+from hears.filtering.filterbank import Filterbank,FunctionFilterbank,ControlFilterbank, CombinedFilterbank
+from hears.filtering.filterbanklibrary import *
+from hears.filtering.linearfilterbank import *
 import warnings
 from scipy.io import loadmat,savemat
-from brian.hears import *
+from hears import *
 
 
 try:

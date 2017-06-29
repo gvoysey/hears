@@ -4,8 +4,8 @@ try:
 except ImportError:
     from scipy import weave
 from scipy import signal, random
-from filterbank import Filterbank, RestructureFilterbank
-from ..bufferable import Bufferable
+from hears.filtering.filterbank import Filterbank, RestructureFilterbank
+from hears.bufferable import Bufferable
 from itertools import izip
 
 __all__ = ['LinearFilterbank']

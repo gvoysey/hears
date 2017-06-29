@@ -1,6 +1,6 @@
 from brian import *
-from filterbank import Filterbank, FunctionFilterbank, CombinedFilterbank
-from filterbanklibrary import *
+from hears.filtering.filterbank import Filterbank, FunctionFilterbank, CombinedFilterbank
+from hears.filtering.filterbanklibrary import *
 
 __all__ = ['DRNL']
 

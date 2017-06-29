@@ -1,8 +1,8 @@
 from brian import *
-from hrtf import *
-from ..prefs import get_samplerate
-from ..filtering.fractionaldelay import FractionalDelay
-from ..sounds import silence
+from hears.hrtf.hrtf import *
+from hears.prefs import get_samplerate
+from hears.filtering.fractionaldelay import FractionalDelay
+from hears.sounds import silence
 
 __all__ = ['HeadlessDatabase']
 

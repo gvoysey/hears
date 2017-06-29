@@ -1,6 +1,6 @@
 from brian import *
-from ..sounds import Sound
-from ..filtering import FIRFilterbank
+from hears.sounds import Sound
+from hears.filtering import FIRFilterbank
 from copy import copy
 
 __all__ = ['HRTF', 'HRTFSet', 'HRTFDatabase',
