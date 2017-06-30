@@ -1,14 +1,21 @@
-from brian import *
+from brian2 import *
+
 try:
     import weave
 except ImportError:
     from scipy import weave
-from scipy import signal, random
 from hears.filtering.filterbank import Filterbank, RestructureFilterbank
-from hears.bufferable import Bufferable
-from itertools import izip
+from logging import info
+
+try:
+    from itertools import izip as zip
+except ImportError:  # will be 3.x series
+    pass
+
+from six.moves import xrange
 
 __all__ = ['LinearFilterbank']
+
 
 def _scipy_apply_linear_filterbank(b, a, x, zi):
     '''
@@ -22,34 +29,34 @@ def _scipy_apply_linear_filterbank(b, a, x, zi):
     a chain (cascade) to apply (you do first with (:,:,0) then (:,:,1), etc.),
     and s is the size of the buffer segment.
     '''
-    alf_cache_b00 = [0]*zi.shape[2]
-    alf_cache_a1 = [0]*zi.shape[2]
-    alf_cache_b1 = [0]*zi.shape[2]
-    alf_cache_zi00 = [0]*zi.shape[2]
-    alf_cache_zi0 = [0]*zi.shape[2]
-    alf_cache_zi1 = [0]*zi.shape[2]
+    alf_cache_b00 = [0] * zi.shape[2]
+    alf_cache_a1 = [0] * zi.shape[2]
+    alf_cache_b1 = [0] * zi.shape[2]
+    alf_cache_zi00 = [0] * zi.shape[2]
+    alf_cache_zi0 = [0] * zi.shape[2]
+    alf_cache_zi1 = [0] * zi.shape[2]
     for curf in xrange(zi.shape[2]):
         alf_cache_b00[curf] = b[:, 0, curf]
         alf_cache_zi00[curf] = zi[:, 0, curf]
         alf_cache_b1[curf] = b[:, 1:b.shape[1], curf]
         alf_cache_a1[curf] = a[:, 1:b.shape[1], curf]
-        alf_cache_zi0[curf] = zi[:, 0:b.shape[1]-1, curf]
+        alf_cache_zi0[curf] = zi[:, 0:b.shape[1] - 1, curf]
         alf_cache_zi1[curf] = zi[:, 1:b.shape[1], curf]
     X = x.copy()
     output = empty_like(X)
     num_cascade = zi.shape[2]
-    b_loop_size = b.shape[1]-2
+    b_loop_size = b.shape[1] - 2
     y = zeros(zi.shape[0])
     yr = reshape(y, (1, len(y))).T
     t = zeros(alf_cache_b1[0].shape, order='F')
     t2 = zeros(alf_cache_b1[0].shape, order='F')
-    for sample, (x, o) in enumerate(izip(X, output)):
+    for sample, (x, o) in enumerate(zip(X, output)):
         xr = reshape(x, (1, len(x))).T
         for curf in xrange(num_cascade):
-            #y = b[:, 0, curf]*x+zi[:, 0, curf]
+            # y = b[:, 0, curf]*x+zi[:, 0, curf]
             multiply(alf_cache_b00[curf], x, y)
             add(y, alf_cache_zi00[curf], y)
-            #zi[:, :i-1, curf] = b[:, 1:i, curf]*xr+zi[:, 1:i, curf]-a[:, 1:i, curf]*yr
+            # zi[:, :i-1, curf] = b[:, 1:i, curf]*xr+zi[:, 1:i, curf]-a[:, 1:i, curf]*yr
             multiply(alf_cache_b1[curf], xr, t)
             add(t, alf_cache_zi1[curf], t)
             multiply(alf_cache_a1[curf], yr, t2)
@@ -60,14 +67,14 @@ def _scipy_apply_linear_filterbank(b, a, x, zi):
             xr = yr
             y = u
             yr = ur
-        #output[sample] = y
+        # output[sample] = y
         o[:] = x
     return output
 
 
 def _weave_apply_linear_filterbank(b, a, x, zi,
                                    cpp_compiler, extra_compile_args):
-    if zi.shape[2]>1:
+    if zi.shape[2] > 1:
         # we need to do this so as not to alter the values in x in the C code below
         # but if zi.shape[2] is 1 there is only one filter in the chain and the
         # copy operation at the end of the C code will never happen.
@@ -79,9 +86,9 @@ def _weave_apply_linear_filterbank(b, a, x, zi,
     n, m, p = b.shape
     n1, m1, p1 = a.shape
     numsamples = x.shape[0]
-    if n1!=n or m1!=m or p1!=p or x.shape!=(numsamples, n) or zi.shape!=(n, m, p):
+    if n1 != n or m1 != m or p1 != p or x.shape != (numsamples, n) or zi.shape != (n, m, p):
         raise ValueError('Data has wrong shape.')
-    if numsamples>1 and not x.flags['C_CONTIGUOUS']:
+    if numsamples > 1 and not x.flags['C_CONTIGUOUS']:
         raise ValueError('Input data must be C_CONTIGUOUS')
     if not b.flags['F_CONTIGUOUS'] or not a.flags['F_CONTIGUOUS'] or not zi.flags['F_CONTIGUOUS']:
         raise ValueError('Filter parameters must be F_CONTIGUOUS')
@@ -111,11 +118,11 @@ def _weave_apply_linear_filterbank(b, a, x, zi,
     weave.inline(code, ['b', 'a', 'x', 'zi', 'y', 'n', 'm', 'p', 'numsamples'],
                  compiler=cpp_compiler,
                  extra_compile_args=extra_compile_args)
-    return y 
+    return y
 
 
 class LinearFilterbank(Filterbank):
-    '''
+    """
     Generalised linear filterbank
     
     Initialisation arguments:
@@ -167,39 +174,40 @@ class LinearFilterbank(Filterbank):
                                 -1              -na
                     a[0] + a[1]z  + ... + a[m] z
         
-    '''
+    """
+
     def __init__(self, source, b, a):
         # Automatically duplicate mono input to fit the desired output shape
-        if b.shape[0]!=source.nchannels:
-            if source.nchannels!=1:
-                raise ValueError('Can only automatically duplicate source channels for mono sources, use RestructureFilterbank.')
+        if b.shape[0] != source.nchannels:
+            if source.nchannels != 1:
+                raise ValueError(
+                    'Can only automatically duplicate source channels for mono sources, use RestructureFilterbank.')
             source = RestructureFilterbank(source, b.shape[0])
         Filterbank.__init__(self, source)
         # Weave version of filtering requires Fortran ordering of filter params
-        if len(b.shape)==2 and len(a.shape)==2:
-            b = reshape(b, b.shape+(1,))
-            a = reshape(a, a.shape+(1,))
+        if len(b.shape) == 2 and len(a.shape) == 2:
+            b = reshape(b, b.shape + (1,))
+            a = reshape(a, a.shape + (1,))
         self.filt_b = array(b, order='F')
         self.filt_a = array(a, order='F')
         self.filt_state = zeros((b.shape[0], b.shape[1], b.shape[2]), order='F')
-        self.use_weave = get_global_preference('useweave')
+        self.use_weave = prefs['useweave']
         if self.use_weave:
-            log_info('brian.hears.filtering.linearfilterbank', 'Using weave')
-            self.cpp_compiler = get_global_preference('weavecompiler')
+            info('brian.hears.filtering.linearfilterbank', 'Using weave')
+            self.cpp_compiler = prefs['weavecompiler']
             self.extra_compile_args = ['-O3']
-            if self.cpp_compiler=='gcc':
-                self.extra_compile_args += get_global_preference('gcc_options')
-
+            if self.cpp_compiler == 'gcc':
+                self.extra_compile_args += prefs['gcc_options']
 
     def reset(self):
         self.buffer_init()
-        
+
     def buffer_init(self):
         Filterbank.buffer_init(self)
         self.filt_state[:] = 0
-    
+
     def buffer_apply(self, input):
-        
+
         if self.use_weave:
             return _weave_apply_linear_filterbank(self.filt_b, self.filt_a, input,
                                                   self.filt_state, self.cpp_compiler,
@@ -207,7 +215,7 @@ class LinearFilterbank(Filterbank):
         else:
             return _scipy_apply_linear_filterbank(self.filt_b, self.filt_a, input,
                                                   self.filt_state)
-        
+
     def decascade(self, ncascade=1):
         '''
         Reduces cascades of low order filters into smaller cascades of high order filters.
@@ -218,15 +226,15 @@ class LinearFilterbank(Filterbank):
         Note that higher order filters are often numerically unstable.
         '''
         n, m, p = self.filt_b.shape
-        if p%ncascade!=0:
+        if p % ncascade != 0:
             raise ValueError('Number of cascades must be a divisor of original number of cascaded filters.')
-        b = zeros((n, (m-1)*(p/ncascade)+1, ncascade))
-        a = zeros((n, (m-1)*(p/ncascade)+1, ncascade))
+        b = zeros((n, (m - 1) * (p / ncascade) + 1, ncascade))
+        a = zeros((n, (m - 1) * (p / ncascade) + 1, ncascade))
         for i in xrange(n):
             for k in xrange(ncascade):
                 bp = ones(1)
                 ap = ones(1)
-                for j in xrange(k*(p/ncascade), (k+1)*(p/ncascade)):
+                for j in xrange(k * (p / ncascade), (k + 1) * (p / ncascade)):
                     bp = polymul(bp, self.filt_b[i, ::-1, j])
                     ap = polymul(ap, self.filt_a[i, ::-1, j])
                 bp = bp[::-1]
@@ -239,12 +247,14 @@ class LinearFilterbank(Filterbank):
         self.filt_b = array(b, order='F')
         self.filt_a = array(a, order='F')
         self.filt_state = zeros((b.shape[0], b.shape[1], b.shape[2]), order='F')
-                
+
+
 # Use the GPU version if available
 try:
-    if get_global_preference('brianhears_usegpu'):
+    if prefs['brianhears_usegpu']:
         import pycuda
         from gpulinearfilterbank import LinearFilterbank
+
         use_gpu = True
     else:
         use_gpu = False

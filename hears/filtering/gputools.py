@@ -1,4 +1,5 @@
-from brian.log import *
+#from brian2.log import *
+from logging import debug
 import atexit
 
 __all__ = ['initialise_cuda', 'set_gpu_device', 'close_cuda']
@@ -22,7 +23,7 @@ try:
         This function makes pycuda use GPU number n in the system.
         """
         initialise_cuda()
-        log_debug('brian.hears', "Setting PyCUDA context number %d" % n)
+        debug('brian.hears', "Setting PyCUDA context number %d" % n)
         try:
             pycuda.context.detach()
         except:
@@ -34,7 +35,7 @@ try:
         Closes the current context. MUST be called at the end of the script.
         """
         if pycuda.context is not None:
-            log_debug('brian.hears', "Closing current PyCUDA context")
+            debug('brian.hears', "Closing current PyCUDA context")
             try:
                 pycuda.context.pop()
                 pycuda.context = None
