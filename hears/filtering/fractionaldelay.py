@@ -1,11 +1,14 @@
-from brian import *
+from brian2 import *
 from hears.filtering.filterbank import *
 from hears.filtering.firfilterbank import *
 
+from math import ceil, pi
+
 __all__ = ['FractionalDelay']
 
+
 class FractionalDelay(FIRFilterbank):
-    '''
+    """
     Filterbank for applying delays which are fractional multiples of the timestep
     
     Initialised with arguments:
@@ -53,36 +56,38 @@ class FractionalDelay(FIRFilterbank):
     The filters induce a delay of ``delay_offset+delay`` where ``delay_offset``
     is a positive value larger than the maximum positive or negative delay.
     This value is available as the attribute ``delay_offset``.
-    '''
+    """
+
     def __init__(self, source, delays, filter_length=None, **args):
         delays = array(delays)
         delay_max = amax(abs(delays))
-        delay_max_int = int(ceil(source.samplerate*delay_max))
+        delay_max_int = int(ceil(source.samplerate * delay_max))
         if filter_length is None:
-            filter_length = 2*int(delay_max_int*1.25)+1
-            if filter_length<2048:
+            filter_length = 2 * int(delay_max_int * 1.25) + 1
+            if filter_length < 2048:
                 filter_length = 2048
-        if filter_length/2<=delay_max_int:
+        if filter_length / 2 <= delay_max_int:
             raise ValueError('Filter length not long enough for selected delays.')
-        self.delay_offset = (filter_length//2)/source.samplerate
+        self.delay_offset = (filter_length // 2) / source.samplerate
         self.filter_length = filter_length
         self.delays = delays
         irs = [fractional_delay_ir(delay, source.samplerate,
-                    filter_length=filter_length) for delay in delays]
+                                   filter_length=filter_length) for delay in delays]
         irs = array(irs)
         self.impulse_response = irs
         FIRFilterbank.__init__(self, source, irs, **args)
 
+
 # Adapted from
 # http://www.labbookpages.co.uk/audio/beamforming/fractionalDelay.html    
 def fractional_delay_ir(delay, samplerate, filter_length=151):
-    delay = delay*samplerate
+    delay = delay * samplerate
     centre_tap = filter_length // 2
     t = arange(filter_length)
-    x = t-delay
-    if abs(round(delay)-float(delay))<1e-10:
-        return array(x==centre_tap, dtype=float)
-    sinc = sin(pi*(x-centre_tap))/(pi*(x-centre_tap))
-    window = 0.54-0.46*cos(2.0*pi*(x+0.5)/filter_length) # Hamming window
-    tap_weight = window*sinc
+    x = t - delay
+    if abs(round(delay) - float(delay)) < 1e-10:
+        return array(x == centre_tap, dtype=float)
+    sinc = sin(pi * (x - centre_tap)) / (pi * (x - centre_tap))
+    window = 0.54 - 0.46 * cos(2.0 * pi * (x + 0.5) / filter_length)  # Hamming window
+    tap_weight = window * sinc
     return tap_weight
