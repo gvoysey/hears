@@ -1,16 +1,15 @@
-from brian import *
+from brian2 import *
+
 try:
     import weave
 except ImportError:
     from scipy import weave
-from scipy import signal, random
 from hears.bufferable import Bufferable
-from operator import isSequenceType
-from __builtin__ import all
+from six.moves import range
 
 __all__ = ['Filterbank',
            'RestructureFilterbank',
-                'Repeat', 'Tile', 'Join', 'Interleave',
+           'Repeat', 'Tile', 'Join', 'Interleave',
            'FunctionFilterbank',
            'SumFilterbank',
            'DoNothingFilterbank',
@@ -18,8 +17,9 @@ __all__ = ['Filterbank',
            'CombinedFilterbank',
            ]
 
+
 class Filterbank(Bufferable):
-    '''
+    """
     Generalised filterbank object
     
     **Documentation common to all filterbanks**
@@ -91,8 +91,8 @@ class Filterbank(Bufferable):
     and sums over the channels (``axis=1``). It's important to reshape the
     output so that it has shape ``(bufsize, outputnchannels)`` so that it can
     be used as the input to subsequent filterbanks.
-    '''
-       
+    """
+
     def __init__(self, source):
         if isinstance(source, Bufferable):
             self.source = source
@@ -102,9 +102,9 @@ class Filterbank(Bufferable):
             self.nchannels = source[0].nchannels
             self.samplerate = source[0].samplerate
             for s in source:
-                if s.nchannels!=self.nchannels:
+                if s.nchannels != self.nchannels:
                     raise ValueError('All sources must have the same number of channels.')
-                if int(s.samplerate)!=int(self.samplerate):
+                if int(s.samplerate) != int(self.samplerate):
                     raise ValueError('All sources must have the same samplerate.')
             self.source = source
 
@@ -114,23 +114,23 @@ class Filterbank(Bufferable):
             return
         if isinstance(source, tuple):
             for s in source:
-                if int(s.samplerate)!=int(self.samplerate):
+                if int(s.samplerate) != int(self.samplerate):
                     raise ValueError('source samplerate is wrong.')
             for news, olds in zip(source, self._source):
-                if news.nchannels!=olds.nchannels:
+                if news.nchannels != olds.nchannels:
                     raise ValueError('New sources have different numbers of channels to old sources.')
             self._source = source
             return
-        if source.nchannels==self.nchannels:
+        if source.nchannels == self.nchannels:
             self._source = source
             return
-        if source.nchannels==1:
+        if source.nchannels == 1:
             self._source = Repeat(source, self.nchannels)
         else:
             raise ValueError('New source must have the same number of channels as old source.')
 
-    source = property(fget=lambda self:self._source,
-                      fset=lambda self, source:self.change_source(source),
+    source = property(fget=lambda self: self._source,
+                      fset=lambda self, source: self.change_source(source),
                       doc='''
         The source of the filterbank, a :class:`Bufferable` object, e.g. another
         :class:`Filterbank` or a :class:`Sound`. It can also be a tuple of 
@@ -141,7 +141,7 @@ class Filterbank(Bufferable):
         insert a dummy filterbank (:class:`DoNothingFilterbank`) which is
         guaranteed to work if you change the source.
         ''')
-    
+
     def get_duration(self):
         if hasattr(self, '_duration'):
             return self._duration
@@ -158,7 +158,7 @@ class Filterbank(Bufferable):
 
     def set_duration(self, duration):
         self._duration = duration
-    
+
     duration = property(fget=get_duration, fset=set_duration, doc='''
         The duration of the filterbank. If it is not specified by the user, it
         is computed by finding the maximum of its source durations. If these are
@@ -204,17 +204,17 @@ class Filterbank(Bufferable):
         if duration is None:
             duration = self.duration
         if not isinstance(duration, int):
-            duration = int(duration*self.samplerate)
+            duration = int(duration * self.samplerate)
         if not isinstance(buffersize, int):
-            buffersize = int(buffersize*self.samplerate)
+            buffersize = int(buffersize * self.samplerate)
         self.buffer_init()
         endpoints = hstack((arange(0, duration, buffersize), duration))
         zendpoints = zip(endpoints[:-1], endpoints[1:])
-        #sizes = diff(endpoints)
+        # sizes = diff(endpoints)
         if func is None:
             return vstack(tuple(self.buffer_fetch(start, end) for start, end in zendpoints))
         else:
-            if func.func_code.co_argcount==1:
+            if func.func_code.co_argcount == 1:
                 for start, end in zendpoints:
                     func(self.buffer_fetch(start, end))
             else:
@@ -238,58 +238,60 @@ class Filterbank(Bufferable):
     def buffer_fetch_next(self, samples):
         start = self.next_sample
         self.next_sample += samples
-        end = start+samples
+        end = start + samples
         input = self.source.buffer_fetch(start, end)
         return self.buffer_apply(input)
-    
-    def __add__ (self, other):
+
+    def __add__(self, other):
         if isinstance(other, Bufferable):
             return SumFilterbank((self, other))
         else:
-            func = lambda x: other+x
+            func = lambda x: other + x
             return FunctionFilterbank(self, func)
+
     __radd__ = __add__
-        
-    def __sub__ (self, other):
+
+    def __sub__(self, other):
         if isinstance(other, Bufferable):
             return SumFilterbank((self, other), (1, -1))
         else:
-            func = lambda x: x-other
+            func = lambda x: x - other
             return FunctionFilterbank(self, func)
-        
-    def __rsub__ (self, other):
+
+    def __rsub__(self, other):
         # Note that __rsub__ should return other-self
         if isinstance(other, Bufferable):
             return SumFilterbank((self, other), (-1, 1))
         else:
-            func = lambda x: other-x
+            func = lambda x: other - x
             return FunctionFilterbank(self, func)
 
     def __mul__(self, other):
         if isinstance(other, Bufferable):
-            func = lambda x, y: x*y
+            func = lambda x, y: x * y
             return FunctionFilterbank((self, other), func)
         else:
-            func = lambda x: x*other
-            return FunctionFilterbank(self, func)        
+            func = lambda x: x * other
+            return FunctionFilterbank(self, func)
+
     __rmul__ = __mul__
 
     def __div__(self, other):
         if isinstance(other, Bufferable):
-            func = lambda x, y: x/y
+            func = lambda x, y: x / y
             return FunctionFilterbank((self, other), func)
         else:
-            func = lambda x: x/other
-            return FunctionFilterbank(self, func)        
+            func = lambda x: x / other
+            return FunctionFilterbank(self, func)
 
     def __rdiv__(self, other):
         # Note __rdiv__ returns other/self
         if isinstance(other, Bufferable):
-            func = lambda x, y: x/y
+            func = lambda x, y: x / y
             return FunctionFilterbank((other, self), func)
         else:
-            func = lambda x: other/x
-            return FunctionFilterbank(self, func)        
+            func = lambda x: other / x
+            return FunctionFilterbank(self, func)
 
 
 class RestructureFilterbank(Filterbank):
@@ -362,16 +364,17 @@ class RestructureFilterbank(Filterbank):
         swap the left and right of each source, but leave the order of the
         sources the same, i.e. the output would be ``BADC``.        
     '''
+
     def __init__(self, source, numrepeat=1, type='serial', numtile=1,
                  indexmapping=None):
         self._has_been_optimised = False
         self._reinit(source, numrepeat, type, numtile, indexmapping)
-    
+
     def _do_reinit(self):
         self._reinit(*self._original_init_arguments)
         if self._has_been_optimised:
             self._optimisation_target._do_reinit()
-    
+
     def _reinit(self, source, numrepeat, type, numtile, indexmapping):
         self._original_init_arguments = (source, numrepeat, type, numtile, indexmapping)
         if isinstance(source, Bufferable):
@@ -381,13 +384,13 @@ class RestructureFilterbank(Filterbank):
             idx = hstack(([0], cumsum(nchannels)))
             I = [arange(start, stop) for start, stop in zip(idx[:-1], idx[1:])]
             I = tuple(repeat(i, numrepeat) for i in I)
-            if type=='serial':
+            if type == 'serial':
                 indexmapping = hstack(I)
-            elif type=='interleave':
-                if len(unique(nchannels))!=1:
+            elif type == 'interleave':
+                if len(unique(nchannels)) != 1:
                     raise ValueError('For interleaving, all inputs must have an equal number of channels.')
                 I0 = len(I[0])
-                indexmapping = zeros(I0*len(I), dtype=int)
+                indexmapping = zeros(I0 * len(I), dtype=int)
                 for j, i in enumerate(I):
                     indexmapping[j::len(I)] = i
             else:
@@ -414,28 +417,28 @@ class RestructureFilterbank(Filterbank):
             sourceoffsets = hstack((0, cumsum(sourcesizes)))
             # gives the index of the source of each element of indexmapping
             sourceindices = digitize(indexmapping, cumsum(sourcesizes))
-            for i in xrange(len(indexmapping)):
+            for i in range(len(indexmapping)):
                 source_index = sourceindices[i]
                 s = source[source_index]
-                relative_index = indexmapping[i]-sourceoffsets[source_index]
+                relative_index = indexmapping[i] - sourceoffsets[source_index]
                 source_relative_index = s.indexmapping[relative_index]
-                new_index = source_relative_index+newsourceoffsets[source_index]
+                new_index = source_relative_index + newsourceoffsets[source_index]
                 new_indexmapping[i] = new_index
             source = newsource
             indexmapping = new_indexmapping
-                
+
         self.indexmapping = indexmapping
         self.nchannels = len(indexmapping)
         self.samplerate = source[0].samplerate
         for s in source:
-            if int(s.samplerate)!=int(self.samplerate):
+            if int(s.samplerate) != int(self.samplerate):
                 raise ValueError('All sources must have the same samplerate.')
         self._source = source
 
     def buffer_fetch_next(self, samples):
         start = self.next_sample
         self.next_sample += samples
-        end = start+samples
+        end = start + samples
         inputs = tuple(s.buffer_fetch(start, end) for s in self.source)
         input = hstack(inputs)
         input = input[:, self.indexmapping]
@@ -448,34 +451,41 @@ class RestructureFilterbank(Filterbank):
         oldsource, numrepeat, type, numtile, indexmapping = self._original_init_arguments
         self._original_init_arguments = source, numrepeat, type, numtile, indexmapping
         self._do_reinit()
-#        self._reinit(source, numrepeat, type, numtile, indexmapping)
+
+
+# self._reinit(source, numrepeat, type, numtile, indexmapping)
 #        if self._has_been_optimised:
 #            target = self._optimisation_target
 #            target._reinit(*target._original_init_arguments)
 
 class Repeat(RestructureFilterbank):
-    '''
+    """
     Filterbank that repeats each channel from its input, e.g. with 3 repeats
     channels ABC would map to AAABBBCCC.
-    '''
+    """
+
     def __init__(self, source, numrepeat):
         RestructureFilterbank.__init__(self, source, numrepeat)
 
+
 class Tile(RestructureFilterbank):
-    '''
+    """
     Filterbank that tiles the channels from its input, e.g. with 3 tiles
     channels ABC would map to ABCABCABC.
-    '''
+    """
+
     def __init__(self, source, numtile):
         RestructureFilterbank.__init__(self, source, numtile=numtile)
-        
+
+
 class Join(RestructureFilterbank):
-    '''
+    """
     Filterbank that joins the channels of its inputs in series, e.g. with two
     input sources with channels AB and CD respectively, the output would have
     channels ABCD. You can initialise with multiple sources separated by
     commas, or by passing a list of sources.
-    '''
+    """
+
     def __init__(self, *sources):
         source = []
         for s in sources:
@@ -484,14 +494,16 @@ class Join(RestructureFilterbank):
             else:
                 source.extend(s)
         RestructureFilterbank.__init__(self, tuple(source), type='serial')
-        
+
+
 class Interleave(RestructureFilterbank):
-    '''
+    """
     Filterbank that interleaves the channels of its inputs, e.g. with two
     input sources with channels AB and CD respectively, the output would have
     channels ACBD. You can initialise with multiple sources separated by
     commas, or by passing a list of sources.
-    '''
+    """
+
     def __init__(self, *sources):
         source = []
         for s in sources:
@@ -501,8 +513,9 @@ class Interleave(RestructureFilterbank):
                 source.extend(s)
         RestructureFilterbank.__init__(self, tuple(source), type='interleave')
 
+
 class FunctionFilterbank(Filterbank):
-    '''
+    """
     Filterbank that just applies a given function. The function should take
     as many arguments as there are sources.
     
@@ -526,8 +539,9 @@ class FunctionFilterbank(Filterbank):
     If you want a filterbank that changes the shape of the input (e.g. changes
     the number of channels), set the ``nchannels`` keyword argument to the
     number of output channels.
-    '''
-    def __init__(self, source, func, nchannels=None,**params):
+    """
+
+    def __init__(self, source, func, nchannels=None, **params):
         if isinstance(source, Bufferable):
             source = (source,)
         Filterbank.__init__(self, source)
@@ -538,14 +552,14 @@ class FunctionFilterbank(Filterbank):
 
     def buffer_fetch_next(self, samples):
         start = self.cached_buffer_end
-        end = start+samples
+        end = start + samples
         inputs = tuple(s.buffer_fetch(start, end) for s in self.source)
-#        print inputs,self.params
-        return self.func(*inputs,**self.params)
+        #        print inputs,self.params
+        return self.func(*inputs, **self.params)
 
 
 class SumFilterbank(FunctionFilterbank):
-    '''  
+    """  
     Sum filterbanks together with given weight vectors.
     
     For example, to take the sum of two filterbanks::
@@ -555,17 +569,18 @@ class SumFilterbank(FunctionFilterbank):
     To take the difference::
     
         SumFilterbank((fb1, fb2), (1, -1))
-    '''
+    """
+
     def __init__(self, source, weights=None):
         if weights is None:
             weights = ones(len(source))
         self.weights = weights
-        func = lambda *inputs: sum(input*w for input, w in zip(inputs, weights))
+        func = lambda *inputs: sum(input * w for input, w in zip(inputs, weights))
         FunctionFilterbank.__init__(self, source, func)
 
 
 class DoNothingFilterbank(Filterbank):
-    '''
+    """
     Filterbank that does nothing to its input.
     
     Useful for removing a set of filters without having to rewrite your code.
@@ -582,13 +597,14 @@ class DoNothingFilterbank(Filterbank):
                 
     However, a more general way of writing compound filterbanks is to use
     :class:`CombinedFilterbank`.
-    '''
+    """
+
     def buffer_apply(self, input):
         return input
 
 
 class ControlFilterbank(Filterbank):
-    '''
+    """
     Filterbank that can be used for controlling behaviour at runtime
     
     Typically, this class is used to implement a control path in an auditory
@@ -689,7 +705,8 @@ class ControlFilterbank(Filterbank):
         gain_fb = GainFilterbank(source)
         updater = GainController(gain_fb, 0.2, 50*ms)
         control = ControlFilterbank(gain_fb, source, gain_fb, updater, 10*ms)            
-    '''
+    """
+
     def __init__(self, source, inputs, targets, updater, max_interval=None):
         Filterbank.__init__(self, source)
         if not isinstance(inputs, (list, tuple)):
@@ -700,20 +717,20 @@ class ControlFilterbank(Filterbank):
         self.updater = updater
         if max_interval is not None:
             if not isinstance(max_interval, int):
-                max_interval = int(max_interval*source.samplerate)
-            for x in inputs+targets:
+                max_interval = int(max_interval * source.samplerate)
+            for x in inputs + targets:
                 x.maximum_buffer_size = max_interval
             self.maximum_buffer_size = max_interval
-            
+
     def buffer_init(self):
         Filterbank.buffer_init(self)
         if hasattr(self.updater, 'reinit'):
             self.updater.reinit()
-    
+
     def buffer_fetch_next(self, samples):
         start = self.next_sample
         self.next_sample += samples
-        end = start+samples
+        end = start + samples
         source_input = self.source.buffer_fetch(start, end)
         input_buffers = [x.buffer_fetch(start, end) for x in self.inputs]
         self.updater(*input_buffers)
@@ -721,7 +738,7 @@ class ControlFilterbank(Filterbank):
 
 
 class CombinedFilterbank(Filterbank):
-    '''
+    """
     Filterbank that encapsulates a chain of filterbanks internally.
     
     This class should mostly be used by people writing extensions to Brian hears
@@ -759,7 +776,8 @@ class CombinedFilterbank(Filterbank):
     provides a buffer (in fact, a :class:`DoNothingFilterbank`) so that the
     input to the chain of filters defined by the derived class doesn't need to
     be changed.
-    '''
+    """
+
     def __init__(self, source):
         Filterbank.__init__(self, source)
 
@@ -767,11 +785,11 @@ class CombinedFilterbank(Filterbank):
         if hasattr(self, '_duration'):
             return self._duration
         else:
-            return max(Filterbank.get_duration(self), self.output.duration)        
+            return max(Filterbank.get_duration(self), self.output.duration)
 
-    source = property(fget=lambda self:self._source,
-                      fset=lambda self, source:self.change_source(source))
-    
+    source = property(fget=lambda self: self._source,
+                      fset=lambda self, source: self.change_source(source))
+
     def change_source(self, source):
         Filterbank.change_source(self, source)
         if hasattr(self, '_modified_source'):
@@ -780,14 +798,14 @@ class CombinedFilterbank(Filterbank):
     def get_modified_source(self):
         self._modified_source = DoNothingFilterbank(self.source)
         return self._modified_source
-    
+
     def set_output(self, output):
         self.output = output
         self.nchannels = output.nchannels
-                    
+
     def buffer_init(self):
         Filterbank.buffer_init(self)
         self.output.buffer_init()
-            
+
     def buffer_fetch(self, start, end):
         return self.output.buffer_fetch(start, end)
