@@ -1,7 +1,8 @@
-from brian import *
+from brian2 import *
 from hears.erb import *
 
 __all__ = ['log_frequency_xaxis_labels', 'log_frequency_yaxis_labels']
+
 
 def log_frequency_xaxis_labels(ax=None, freqs=None):
     '''
@@ -25,6 +26,7 @@ def log_frequency_xaxis_labels(ax=None, freqs=None):
         ax = gca()
     return log_frequency_axis_labels(ax.xaxis, freqs=freqs)
 
+
 def log_frequency_yaxis_labels(ax=None, freqs=None):
     '''
     Sets tick positions for log-scale frequency x-axis at sensible locations.
@@ -47,6 +49,7 @@ def log_frequency_yaxis_labels(ax=None, freqs=None):
         ax = gca()
     return log_frequency_axis_labels(ax.yaxis, freqs=freqs)
 
+
 def log_frequency_axis_labels(ax, freqs=None):
     if freqs is not None:
         ax.set_major_locator(FixedLocator(freqs))
@@ -64,7 +67,7 @@ def log_frequency_axis_labels(ax, freqs=None):
                       ]
     found = False
     for R in allowed_ranges:
-        if xmin>=amin(R)*0.9999 and xmax<=amax(R)*1.0001:
+        if xmin >= amin(R) * 0.9999 and xmax <= amax(R) * 1.0001:
             found = True
             break
     if not found:
@@ -74,15 +77,16 @@ def log_frequency_axis_labels(ax, freqs=None):
     ax.set_major_formatter(ScalarFormatter())
     ax.set_minor_locator(NullLocator())
 
-if __name__=='__main__':
-    for i, cfs in enumerate([erbspace(150*Hz, 5*kHz, 100),
-                             erbspace(2*Hz, 64*Hz, 100),
-                             erbspace(100*Hz, 10*kHz, 100),
-                             erbspace(100*Hz, 400*Hz, 100),
+
+if __name__ == '__main__':
+    for i, cfs in enumerate([erbspace(150 * Hz, 5 * kHz, 100),
+                             erbspace(2 * Hz, 64 * Hz, 100),
+                             erbspace(100 * Hz, 10 * kHz, 100),
+                             erbspace(100 * Hz, 400 * Hz, 100),
                              ]):
-        subplot(2, 2, i+1)
-        #cfs = erbspace(150*Hz, 5*kHz, 100)
-        semilogx(cfs, 1-((arange(len(cfs))-len(cfs)/2.0)/(len(cfs)/2.0))**2)
+        subplot(2, 2, i + 1)
+        # cfs = erbspace(150*Hz, 5*kHz, 100)
+        semilogx(cfs, 1 - ((arange(len(cfs)) - len(cfs) / 2.0) / (len(cfs) / 2.0)) ** 2)
         axis('tight')
         log_frequency_xaxis_labels()
     show()

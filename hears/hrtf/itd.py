@@ -1,4 +1,4 @@
-from brian import *
+from brian2 import *
 from hears.hrtf.hrtf import *
 from hears.prefs import get_samplerate
 from hears.filtering.fractionaldelay import FractionalDelay

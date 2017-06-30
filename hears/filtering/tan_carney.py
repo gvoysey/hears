@@ -3,25 +3,24 @@ from numpy import pi
 import scipy.signal as signal
 import warnings
 
-from brian.clock import Clock
-from brian.stdunits import Hz, ms
-from brian.threshold import PoissonThreshold
-from brian.reset import CustomRefractoriness
-from brian.neurongroup import NeuronGroup
-from brian.network import network_operation
+from brian2 import Clock, Hz, ms, NeuronGroup, network_operation
+
+from brian2 import PoissonThreshold
+from brian2.reset import CustomRefractoriness
+
 
 from hears.filtering.filterbank import (FunctionFilterbank,
-                                              ControlFilterbank,
-                                              CombinedFilterbank,
-                                              RestructureFilterbank)
+                                        ControlFilterbank,
+                                        CombinedFilterbank,
+                                        RestructureFilterbank)
 from hears.filtering.linearfilterbank import LinearFilterbank
 from hears.filtering.filterbankgroup import FilterbankGroup
 
+__all__ = ['TanCarney', 'MiddleEar', 'ZhangSynapse']
 
-__all__=['TanCarney', 'MiddleEar', 'ZhangSynapse']
 
 class MiddleEar(LinearFilterbank):
-    '''
+    """
     Implements the middle ear model from Tan & Carney (2003) (linear filter
     with two pole pairs and one double zero). The gain is normalized for the
     response of the analog filter at 1000Hz as in the model of Tan & Carney
@@ -34,7 +33,8 @@ class MiddleEar(LinearFilterbank):
     "A Phenomenological Model for the Responses of Auditory-nerve Fibers.
     II. Nonlinear Tuning with a Frequency Glide".
     The Journal of the Acoustical Society of America 114 (2003): 2007.
-    '''
+    """
+
     def __init__(self, source, gain=1, **kwds):
         # Automatically duplicate mono input to fit the desired output shape
         gain = np.atleast_1d(gain)
@@ -51,7 +51,7 @@ class MiddleEar(LinearFilterbank):
         # use an arbitrary gain here, will be normalized afterwards
         b, a = signal.zpk2tf(zeros, poles * 2 * np.pi, 1.5e9)
         # normalize the response at 1000Hz (of the analog filter)
-        resp = np.abs(signal.freqs(b, a, [1000*2*np.pi])[1])  # response magnitude
+        resp = np.abs(signal.freqs(b, a, [1000 * 2 * np.pi])[1])  # response magnitude
         b /= resp
         bd, ad = signal.bilinear(b, a, samplerate)
         bd = (np.tile(bd, (source.nchannels, 1)).T * gain).T
@@ -69,12 +69,13 @@ class ZhangSynapseSpikes(NeuronGroup):
     The `n_per_channel` argument can be used to generate multiple spike trains
     for every channel of the source group.
     '''
+
     def __init__(self, source, n_per_channel=1, params=None):
         params = ZhangSynapse._get_parameters(params)
         c_0, c_1 = params['c_0'], params['c_1']
         s_0, s_1 = params['s_0'], params['s_1']
         R_A = params['R_A']
-        eqs =  '''
+        eqs = '''
         # time-varying discharge rate, input into this model
         s : Hz
         
@@ -86,7 +87,7 @@ class ZhangSynapseSpikes(NeuronGroup):
         # final time-varying discharge rate for the Poisson process, equation 19
         R = s * (1 - H) : Hz
         '''
-        
+
         def reset_func(P, spikes):
             P.e_0[spikes] = 1.0
             P.e_1[spikes] = 1.0
@@ -94,13 +95,13 @@ class ZhangSynapseSpikes(NeuronGroup):
         # make sure that the s value is first updated in
         # ZhangSynapseRate, then this NeuronGroup is
         # updated
-        clock=Clock(dt=source.clock.dt, t=source.clock.t,
-                    order=source.clock.order + 1)
-        
+        clock = Clock(dt=source.clock.dt, t=source.clock.t,
+                      order=source.clock.order + 1)
+
         @network_operation(clock=clock, when='start')
         def distribute_input():
             self.s[:] = source.s.repeat(n_per_channel)
-        
+
         NeuronGroup.__init__(self, len(source) * n_per_channel,
                              model=eqs,
                              threshold=PoissonThreshold('R'),
@@ -108,12 +109,12 @@ class ZhangSynapseSpikes(NeuronGroup):
                                                         period=R_A),
                              clock=clock
                              )
-        
+
         self.contained_objects += [distribute_input]
 
 
 class ZhangSynapse(ZhangSynapseSpikes):
-    '''
+    """
     A `FilterbankGroup` that represents an IHC-AN synapse according to the
     Zhang et al. (2001) model. The `source` should be a filterbank, producing
     V_ihc (e.g. `TanCarney`). `CF` specifies the characteristic frequencies of
@@ -137,42 +138,44 @@ class ZhangSynapse(ZhangSynapseSpikes):
     "A Phenomenological Model for the Responses of Auditory-nerve Fibers:
     I. Nonlinear Tuning with Compression and Suppression".
     The Journal of the Acoustical Society of America 109 (2001): 648.
-    '''
-    
+    """
+
     @staticmethod
     def _get_parameters(params=None):
         # Default values for parameters from table 1, Zhang et al. 2001
-        default_params = {'spont': 50*Hz,
-                          # In the example C code, this is used (with comment: "read Frank's cmpa.c")
-                          'A_SS': 130*Hz, 
-                          'tau_ST': 60*ms,
-                          'tau_R': 2*ms,
-                          'A_RST': 6,
-                          'PTS': 8.627,
-                          'P_Imax': 0.6,
-                          'c_0': 0.5,
-                          'c_1': 0.5,
-                          'R_A': 0.75*ms,
-                          's_0': 1*ms,
-                          's_1': 12.5*ms}
+        default_params = {
+            'spont' : 50 * Hz,
+            # In the example C code, this is used (with comment: "read Frank's cmpa.c")
+            'A_SS'  : 130 * Hz,
+            'tau_ST': 60 * ms,
+            'tau_R' : 2 * ms,
+            'A_RST' : 6,
+            'PTS'   : 8.627,
+            'P_Imax': 0.6,
+            'c_0'   : 0.5,
+            'c_1'   : 0.5,
+            'R_A'   : 0.75 * ms,
+            's_0'   : 1 * ms,
+            's_1'   : 12.5 * ms
+        }
         if params is None:
             return default_params
-    
+
         for param, value in params.iteritems():
             if not param in default_params:
                 raise KeyError(('"%s" is not a valid parameter, '
                                 'has to be one of: %s') % (param,
                                                            str(default_params.keys())))
             default_params[param] = value
-        
-        return default_params     
-    
+
+        return default_params
+
     def __init__(self, source, CF, n_per_channel=1, params=None):
         params = ZhangSynapse._get_parameters(params)
-        
-        rate_model = ZhangSynapseRate(source, CF, params)        
+
+        rate_model = ZhangSynapseRate(source, CF, params)
         ZhangSynapseSpikes.__init__(self, rate_model, n_per_channel, params)
-        
+
         self.contained_objects += [rate_model]
 
 
@@ -185,9 +188,8 @@ class ZhangSynapseRate(FilterbankGroup):
     '''
 
     def __init__(self, source, CF, params=None):
-        
         params = ZhangSynapse._get_parameters(params)
-        
+
         spont = params['spont']
         A_SS = params['A_SS']
         tau_ST = params['tau_ST']
@@ -199,47 +201,47 @@ class ZhangSynapseRate(FilterbankGroup):
         c_1 = params['c_1']
         R_A = params['R_A']
         s_0 = params['s_0']
-        s_1 = params['s_1']                  
-        
+        s_1 = params['s_1']
+
         # Equations A1-A5 of Zhang et al. 2001
-        A_ON  = PTS * A_SS  # onset rate
+        A_ON = PTS * A_SS  # onset rate
         A_R = (A_ON - A_SS) * A_RST / (1 + A_RST)  # rapid response amplitude
         A_ST = A_ON - A_SS - A_R  # short-term response amplitude
         P_rest = P_Imax * spont / A_ON  # resting permeability
-        C_G = spont * (A_ON - spont) / (A_ON*P_rest*(1 - spont/A_SS))  # global concentration
-    
+        C_G = spont * (A_ON - spont) / (A_ON * P_rest * (1 - spont / A_SS))  # global concentration
+
         # Equations A6 (intermediate parameters for store volume computation)
         gamma_1 = C_G / spont
         gamma_2 = C_G / A_SS
         kappa_1 = -1 / tau_R
         kappa_2 = -1 / tau_ST
-    
+
         # Equations A7-A9 (immediate volume)
-        V_I0 = (1 - P_Imax/P_rest)/(gamma_1*((A_R*(kappa_1-kappa_2)/(C_G*P_Imax)) +
-                                             kappa_2/(P_rest*gamma_1) - kappa_2/(P_Imax*gamma_2)))
-        V_I1 = (1 - P_Imax/P_rest)/(gamma_1*((A_ST*(kappa_2-kappa_1)/(C_G*P_Imax)) +
-                                             kappa_1/(P_rest*gamma_1) - kappa_1/(P_Imax*gamma_2)))
+        V_I0 = (1 - P_Imax / P_rest) / (gamma_1 * ((A_R * (kappa_1 - kappa_2) / (C_G * P_Imax)) +
+                                                   kappa_2 / (P_rest * gamma_1) - kappa_2 / (P_Imax * gamma_2)))
+        V_I1 = (1 - P_Imax / P_rest) / (gamma_1 * ((A_ST * (kappa_2 - kappa_1) / (C_G * P_Imax)) +
+                                                   kappa_1 / (P_rest * gamma_1) - kappa_1 / (P_Imax * gamma_2)))
         V_I = 0.5 * (V_I0 + V_I1)
-    
+
         # Equations A10 (other intermediate parameters)
-        alpha = gamma_2 / (kappa_1*kappa_2)
+        alpha = gamma_2 / (kappa_1 * kappa_2)
         beta = -(kappa_1 + kappa_2) * alpha
-        theta_1 = alpha * P_Imax/V_I
-        theta_2 = V_I/P_Imax
-        theta_3 = gamma_2 - 1/P_Imax
-    
+        theta_1 = alpha * P_Imax / V_I
+        theta_2 = V_I / P_Imax
+        theta_3 = gamma_2 - 1 / P_Imax
+
         # Equations A11-A12 (local and global permeabilities)
-        P_L = ((beta - theta_2*theta_3)/theta_1 - 1) * P_Imax
-        P_G = 1 / (theta_3 - 1/P_L)
-    
+        P_L = ((beta - theta_2 * theta_3) / theta_1 - 1) * P_Imax
+        P_G = 1 / (theta_3 - 1 / P_L)
+
         # Equations A13-A15
-        V_L = theta_1*P_L*P_G  # local volume
-        C_Irest = spont/P_rest  # resting value of immediate concentration
-        C_Lrest = C_Irest*(P_rest + P_L)/P_L  # local concentration
-    
+        V_L = theta_1 * P_L * P_G  # local volume
+        C_Irest = spont / P_rest  # resting value of immediate concentration
+        C_Lrest = C_Irest * (P_rest + P_L) / P_L  # local concentration
+
         # Equation 18 with A16 and A17
         p_1 = P_rest / np.log(2)
-    
+
         eqs = '''
         # input into the Synapse
         V_ihc : 1
@@ -268,260 +270,257 @@ class ZhangSynapseRate(FilterbankGroup):
         # time-varying discharge rate (ignoring refractory effects), equation A20
         s = C_I * P_I : Hz
         '''
-    
+
         FilterbankGroup.__init__(self, source, 'V_ihc', model=eqs)
         self.CF_param = CF
         self.C_I = C_Irest
         self.C_L = C_Lrest
-        
 
-def set_parameters(cf,param):
-    
-    parameters=dict()
-    parameters['fc_LP_control']=800 #Hz
-    parameters['fc_LP_fb']=500 #Hz
-    parameters['fp1']=1.0854*cf-106.0034
-    parameters['ta']=10**(np.log10(cf)*1.0230 + 0.1607)
-    parameters['tb']=10**(np.log10(cf)*1.4292 - 1.1550) - 1000
-    parameters['gain80']=10**(np.log10(cf)*0.5732 + 1.5220)
-    parameters['rgain']=10**( np.log10(cf)*0.4 + 1.9)
-    parameters['average_control']=0.3357
-    parameters['zero_r']= np.array(-10**( np.log10(cf)*1.5-0.9 ))   
-        
-    if param: 
-        if not isinstance(param, dict): 
+
+def set_parameters(cf, param):
+    parameters = dict()
+    parameters['fc_LP_control'] = 800  # Hz
+    parameters['fc_LP_fb'] = 500  # Hz
+    parameters['fp1'] = 1.0854 * cf - 106.0034
+    parameters['ta'] = 10 ** (np.log10(cf) * 1.0230 + 0.1607)
+    parameters['tb'] = 10 ** (np.log10(cf) * 1.4292 - 1.1550) - 1000
+    parameters['gain80'] = 10 ** (np.log10(cf) * 0.5732 + 1.5220)
+    parameters['rgain'] = 10 ** (np.log10(cf) * 0.4 + 1.9)
+    parameters['average_control'] = 0.3357
+    parameters['zero_r'] = np.array(-10 ** (np.log10(cf) * 1.5 - 0.9))
+
+    if param:
+        if not isinstance(param, dict):
             raise TypeError('given parameters must be a dict')
         for key in param.keys():
             if key != 'nlgain' and not parameters.has_key(key):
                 raise KeyError(key + ' is invalid key entry for given parameters')
             parameters[key] = param[key]
 
-    parameters['nlgain']= (parameters['gain80'] - parameters['rgain'])/parameters['average_control']
+    parameters['nlgain'] = (parameters['gain80'] - parameters['rgain']) / parameters['average_control']
     return parameters
 
 
 class Control_Coefficients:
-    
-    def __init__(self,cf,samplerate):
+    def __init__(self, cf, samplerate):
         self.cf = cf
-        self.PI2 = 2.*3.14159265358979
-        self.nch=len(cf)
-        self.fs_bilinear = 2.0*samplerate#*ones(self.nch)
-#        self.fs_bilinear =tile(self.fs_bilinear.reshape(self.nch,-1),3)
-        self.x_cf=11.9*np.log10(0.8+cf/456);
-        self.f_shift=(pow(10,((self.x_cf+1.2)/11.9))-0.8)*456-cf
-        self.wbw=cf/4.0
-        self.filt_a = np.zeros((len(cf),3,5), order='F') #8 5
-#        self.filt_a[:,0,:] = 1
-        self.filt_b = np.zeros((len(cf),3,5), order='F')
+        self.PI2 = 2. * 3.14159265358979
+        self.nch = len(cf)
+        self.fs_bilinear = 2.0 * samplerate  # *ones(self.nch)
+        #        self.fs_bilinear =tile(self.fs_bilinear.reshape(self.nch,-1),3)
+        self.x_cf = 11.9 * np.log10(0.8 + cf / 456);
+        self.f_shift = (pow(10, ((self.x_cf + 1.2) / 11.9)) - 0.8) * 456 - cf
+        self.wbw = cf / 4.0
+        self.filt_a = np.zeros((len(cf), 3, 5), order='F')  # 8 5
+        #        self.filt_a[:,0,:] = 1
+        self.filt_b = np.zeros((len(cf), 3, 5), order='F')
         self.control_signal = 0
-        self.preal = np.zeros((self.nch,6))
-        self.pimg = np.zeros((self.nch,6))
-        self.preal,self.pimg = self.analog_poles()
-        
-    def return_coefficients(self,control_signal):
-        self.wbw=-(self.preal[:,0] - control_signal)/self.PI2
-        
-        self.gain_norm_bp=((self.PI2**2
-                            * np.sqrt(self.wbw**2 + self.f_shift**2)
-                            * np.sqrt((2*self.cf+self.f_shift)**2 + self.wbw**2)
-                            )**3)/np.sqrt(self.PI2**2*self.cf**2)#       
-        iord = [1,3,5]  
-        
-        preal = self.preal[:,iord]-control_signal.T  #actually control_signal is the same for the three channels
-        
-        temp=(self.fs_bilinear-(preal))**2 + self.pimg[:,iord]**2    
-        
-        self.filt_a[:,0,0:3] = 1.
-        self.filt_a[:,1,0:3]= -2*(self.fs_bilinear**2-(preal)**2-self.pimg[:,iord]**2)/temp            
-        self.filt_a[:,2,0:3] = ((self.fs_bilinear+(preal))**2+self.pimg[:,iord]**2)/temp
-        self.filt_b[:,0,0:3] = 1./temp
-        self.filt_b[:,1,0:3] = 2./temp  
-        self.filt_b[:,2,0:3] = 1./temp
-        
-        self.filt_a[:,0,3] = 1.
-        self.filt_a[:,1,3]= 1.      ## changed  from 1 to 0
-        self.filt_a[:,2,3] = 0.
-        self.filt_b[:,0,3] = self.fs_bilinear
-        self.filt_b[:,1,3] = -self.fs_bilinear
-        self.filt_b[:,2,3] = 0
-        
-#        self.filt_b[:,:,3] = self.gain_norm_bp*self.filt_b[:,:,3]  
-        
-        self.filt_a[:,0,4] = 1.
-        self.filt_b[:,0,4] = self.gain_norm_bp
-  
-        
-        return self.filt_b,self.filt_a
+        self.preal = np.zeros((self.nch, 6))
+        self.pimg = np.zeros((self.nch, 6))
+        self.preal, self.pimg = self.analog_poles()
+
+    def return_coefficients(self, control_signal):
+        self.wbw = -(self.preal[:, 0] - control_signal) / self.PI2
+
+        self.gain_norm_bp = ((self.PI2 ** 2
+                              * np.sqrt(self.wbw ** 2 + self.f_shift ** 2)
+                              * np.sqrt((2 * self.cf + self.f_shift) ** 2 + self.wbw ** 2)
+                              ) ** 3) / np.sqrt(self.PI2 ** 2 * self.cf ** 2)  #
+        iord = [1, 3, 5]
+
+        preal = self.preal[:, iord] - control_signal.T  # actually control_signal is the same for the three channels
+
+        temp = (self.fs_bilinear - (preal)) ** 2 + self.pimg[:, iord] ** 2
+
+        self.filt_a[:, 0, 0:3] = 1.
+        self.filt_a[:, 1, 0:3] = -2 * (self.fs_bilinear ** 2 - (preal) ** 2 - self.pimg[:, iord] ** 2) / temp
+        self.filt_a[:, 2, 0:3] = ((self.fs_bilinear + (preal)) ** 2 + self.pimg[:, iord] ** 2) / temp
+        self.filt_b[:, 0, 0:3] = 1. / temp
+        self.filt_b[:, 1, 0:3] = 2. / temp
+        self.filt_b[:, 2, 0:3] = 1. / temp
+
+        self.filt_a[:, 0, 3] = 1.
+        self.filt_a[:, 1, 3] = 1.  ## changed  from 1 to 0
+        self.filt_a[:, 2, 3] = 0.
+        self.filt_b[:, 0, 3] = self.fs_bilinear
+        self.filt_b[:, 1, 3] = -self.fs_bilinear
+        self.filt_b[:, 2, 3] = 0
+
+        #        self.filt_b[:,:,3] = self.gain_norm_bp*self.filt_b[:,:,3]
+
+        self.filt_a[:, 0, 4] = 1.
+        self.filt_b[:, 0, 4] = self.gain_norm_bp
+
+        return self.filt_b, self.filt_a
 
     def analog_poles(self):
-        self.preal[:,0] = -self.PI2*self.wbw  #that should be -, actually there are never used
-        self.preal[:,1] = -self.PI2*self.wbw
-        self.preal[:,2] = self.preal[:,0]
-        self.preal[:,3] = self.preal[:,1]
-        self.preal[:,4] = self.preal[:,0]
-        self.preal[:,5] = self.preal[:,1]
+        self.preal[:, 0] = -self.PI2 * self.wbw  # that should be -, actually there are never used
+        self.preal[:, 1] = -self.PI2 * self.wbw
+        self.preal[:, 2] = self.preal[:, 0]
+        self.preal[:, 3] = self.preal[:, 1]
+        self.preal[:, 4] = self.preal[:, 0]
+        self.preal[:, 5] = self.preal[:, 1]
 
-        self.pimg[:,0] = self.PI2*(self.cf+self.f_shift)
-        self.pimg[:,1] = -self.PI2*(self.cf+self.f_shift)
-        self.pimg[:,2] = self.pimg[:,0]
-        self.pimg[:,3] = self.pimg[:,1]
-        self.pimg[:,4] = self.pimg[:,0]
-        self.pimg[:,5] = self.pimg[:,1]
-        
-        return self.preal,self.pimg
-    
-    
+        self.pimg[:, 0] = self.PI2 * (self.cf + self.f_shift)
+        self.pimg[:, 1] = -self.PI2 * (self.cf + self.f_shift)
+        self.pimg[:, 2] = self.pimg[:, 0]
+        self.pimg[:, 3] = self.pimg[:, 1]
+        self.pimg[:, 4] = self.pimg[:, 0]
+        self.pimg[:, 5] = self.pimg[:, 1]
+
+        return self.preal, self.pimg
+
+
 class Signal_Coefficients:
-    
-    def __init__(self,cf,samplerate,parameters):
+    def __init__(self, cf, samplerate, parameters):
         self.t = 0
         self.cf = cf
-        self.PI2 = 2*3.14159265358979
-        self.nch=len(cf)
-        self.fs_bilinear = 2.0*samplerate#*ones(self.nch)
-        
-        self.order_of_pole = 20             
-        self.half_order_pole = self.order_of_pole/2
-        self.order_of_zero  = self.half_order_pole
+        self.PI2 = 2 * 3.14159265358979
+        self.nch = len(cf)
+        self.fs_bilinear = 2.0 * samplerate  # *ones(self.nch)
 
-        self.filt_a = np.zeros((len(cf),3,11), order='F')
-        self.filt_b = np.zeros((len(cf),3,11), order='F')
-        
-        self.preal = np.zeros((self.nch,20))
-        self.pimg = np.zeros((self.nch,20))
-        
+        self.order_of_pole = 20
+        self.half_order_pole = self.order_of_pole / 2
+        self.order_of_zero = self.half_order_pole
+
+        self.filt_a = np.zeros((len(cf), 3, 11), order='F')
+        self.filt_b = np.zeros((len(cf), 3, 11), order='F')
+
+        self.preal = np.zeros((self.nch, 20))
+        self.pimg = np.zeros((self.nch, 20))
+
         self.control_signal = 0
-        
-        self.rgain =parameters['rgain']# 10**(log10(cf)*0.4 + 1.9)
-        self.fp1=parameters['fp1']#1.0854*cf-106.0034
-        self.ta= parameters['ta']#    10**(log10(cf)*1.0230 + 0.1607)
-        self.tb= parameters['tb']#    10**(log10(cf)*1.4292 - 1.1550) - 1000
-        self.zeroa = parameters['zero_r']# -10**(log10(cf)*1.5-0.9 )  
-        
-        self.zeroamat = np.tile(self.zeroa.reshape(self.nch,-1),10)
-        self.preal,self.pimg = self.analog_poles(0)
 
-        
-        self.cfmat = np.tile(self.cf.reshape(self.nch,-1),20)  
-        self.gain_norm = np.sqrt(np.prod((2*pi*self.cfmat-self.pimg[:,0:20])**2+self.preal[:,0:20]**2,axis=1))
+        self.rgain = parameters['rgain']  # 10**(log10(cf)*0.4 + 1.9)
+        self.fp1 = parameters['fp1']  # 1.0854*cf-106.0034
+        self.ta = parameters['ta']  # 10**(log10(cf)*1.0230 + 0.1607)
+        self.tb = parameters['tb']  # 10**(log10(cf)*1.4292 - 1.1550) - 1000
+        self.zeroa = parameters['zero_r']  # -10**(log10(cf)*1.5-0.9 )
 
-        self.gain_norm = self.gain_norm /(np.sqrt((2*pi*self.cf)**2+self.zeroa**2))**self.order_of_zero
-        
-    def return_coefficients(self,control_signal):
-        self.preal,self.pimg = self.analog_poles(control_signal)
-        
-        iord = np.arange(2,22,2)-1
-        temp=(self.fs_bilinear-self.preal[:,iord])**2 + self.pimg[:,iord]**2
-        self.filt_a[:,0,:10] = 1
-        self.filt_a[:,1,:10] = -2*(self.fs_bilinear**2-self.preal[:,iord]**2-self.pimg[:,iord]**2)/temp            
-        self.filt_a[:,2,:10] = ((self.fs_bilinear+self.preal[:,iord])**2+self.pimg[:,iord]**2)/temp
-        
-        self.filt_b[:,0,:10] = (-self.zeroamat+self.fs_bilinear)/temp
-        self.filt_b[:,1,:10] = (-2*self.zeroamat)/temp
-        self.filt_b[:,2,:10] = (-self.zeroamat-self.fs_bilinear)/temp 
-        
-        self.filt_a[:,0,10] = 1.
-        self.filt_b[:,0,10] = self.gain_norm/3.
-        
-        return self.filt_b,self.filt_a
+        self.zeroamat = np.tile(self.zeroa.reshape(self.nch, -1), 10)
+        self.preal, self.pimg = self.analog_poles(0)
 
-    def analog_poles(self,control_signal):
-        aa = -self.rgain-control_signal
-        aa[aa>=0] = 100
-        self.preal[:,0] = -self.rgain-control_signal
-        self.preal[:,4] = self.preal[:,0]-self.ta
-        self.preal[:,2] = (self.preal[:,0]+self.preal[:,4])*0.5
-        self.preal[:,1] = self.preal[:,0]
-        self.preal[:,3] = self.preal[:,2]
-        self.preal[:,5] = self.preal[:,4]
-        
-        self.preal[:,6] = self.preal[:,0]
-        self.preal[:,7] = self.preal[:,1]
-        self.preal[:,8] = self.preal[:,4]
-        self.preal[:,9] = self.preal[:,5]
-        self.preal[:,10:] = self.preal[:,:10]
-        
-        self.pimg[:,0] = self.PI2*self.fp1
-        self.pimg[:,4] = self.pimg[:,0]-self.tb
-        self.pimg[:,2] = (self.pimg[:,0]+self.pimg[:,4])*0.5
-        self.pimg[:,1] = -self.pimg[:,0]
-        self.pimg[:,3] = -self.pimg[:,2]
-        self.pimg[:,5] = -self.pimg[:,4]
-        self.pimg[:,6] = self.pimg[:,0]
-        self.pimg[:,7] = self.pimg[:,1]
-        self.pimg[:,8] = self.pimg[:,4]
-        self.pimg[:,9] = self.pimg[:,5]
-        self.pimg[:,10:] = self.pimg[:,:10]
+        self.cfmat = np.tile(self.cf.reshape(self.nch, -1), 20)
+        self.gain_norm = np.sqrt(
+                np.prod((2 * pi * self.cfmat - self.pimg[:, 0:20]) ** 2 + self.preal[:, 0:20] ** 2, axis=1))
 
-        return self.preal,self.pimg
+        self.gain_norm = self.gain_norm / (np.sqrt((2 * pi * self.cf) ** 2 + self.zeroa ** 2)) ** self.order_of_zero
+
+    def return_coefficients(self, control_signal):
+        self.preal, self.pimg = self.analog_poles(control_signal)
+
+        iord = np.arange(2, 22, 2) - 1
+        temp = (self.fs_bilinear - self.preal[:, iord]) ** 2 + self.pimg[:, iord] ** 2
+        self.filt_a[:, 0, :10] = 1
+        self.filt_a[:, 1, :10] = -2 * (
+            self.fs_bilinear ** 2 - self.preal[:, iord] ** 2 - self.pimg[:, iord] ** 2) / temp
+        self.filt_a[:, 2, :10] = ((self.fs_bilinear + self.preal[:, iord]) ** 2 + self.pimg[:, iord] ** 2) / temp
+
+        self.filt_b[:, 0, :10] = (-self.zeroamat + self.fs_bilinear) / temp
+        self.filt_b[:, 1, :10] = (-2 * self.zeroamat) / temp
+        self.filt_b[:, 2, :10] = (-self.zeroamat - self.fs_bilinear) / temp
+
+        self.filt_a[:, 0, 10] = 1.
+        self.filt_b[:, 0, 10] = self.gain_norm / 3.
+
+        return self.filt_b, self.filt_a
+
+    def analog_poles(self, control_signal):
+        aa = -self.rgain - control_signal
+        aa[aa >= 0] = 100
+        self.preal[:, 0] = -self.rgain - control_signal
+        self.preal[:, 4] = self.preal[:, 0] - self.ta
+        self.preal[:, 2] = (self.preal[:, 0] + self.preal[:, 4]) * 0.5
+        self.preal[:, 1] = self.preal[:, 0]
+        self.preal[:, 3] = self.preal[:, 2]
+        self.preal[:, 5] = self.preal[:, 4]
+
+        self.preal[:, 6] = self.preal[:, 0]
+        self.preal[:, 7] = self.preal[:, 1]
+        self.preal[:, 8] = self.preal[:, 4]
+        self.preal[:, 9] = self.preal[:, 5]
+        self.preal[:, 10:] = self.preal[:, :10]
+
+        self.pimg[:, 0] = self.PI2 * self.fp1
+        self.pimg[:, 4] = self.pimg[:, 0] - self.tb
+        self.pimg[:, 2] = (self.pimg[:, 0] + self.pimg[:, 4]) * 0.5
+        self.pimg[:, 1] = -self.pimg[:, 0]
+        self.pimg[:, 3] = -self.pimg[:, 2]
+        self.pimg[:, 5] = -self.pimg[:, 4]
+        self.pimg[:, 6] = self.pimg[:, 0]
+        self.pimg[:, 7] = self.pimg[:, 1]
+        self.pimg[:, 8] = self.pimg[:, 4]
+        self.pimg[:, 9] = self.pimg[:, 5]
+        self.pimg[:, 10:] = self.pimg[:, :10]
+
+        return self.preal, self.pimg
 
 
-class Filter_Update: 
-    def __init__(self, target,coef):
+class Filter_Update:
+    def __init__(self, target, coef):
         self.coef = coef
         self.target = target
         self.param = []
+
     def __call__(self, input):
-        reshaped_input = input[-1,:].reshape(1,-1)
-        self.target.filt_b,self.target.filt_a = self.coef.return_coefficients(reshaped_input) 
+        reshaped_input = input[-1, :].reshape(1, -1)
+        self.target.filt_b, self.target.filt_a = self.coef.return_coefficients(reshaped_input)
         self.param.append(self.coef.control_signal)
 
 
 class LowPass_IHC(LinearFilterbank):
-    def __init__(self,source,cf,fc,gain,order): 
+    def __init__(self, source, cf, fc, gain, order):
         nch = len(cf)
-        TWOPI = 2*pi
-        self.samplerate =  source.samplerate
+        TWOPI = 2 * pi
+        self.samplerate = source.samplerate
         c = 2.0 * self.samplerate
-        c1LP = ( c/Hz - TWOPI*fc ) / ( c/Hz + TWOPI*fc )
-        c2LP = TWOPI*fc/Hz / (TWOPI*fc + c/Hz)
-        
-        b_temp = np.array([c2LP,c2LP])
-        a_temp = np.array([1,-c1LP])
-        
-        filt_b = np.tile(b_temp.reshape([2,1]),[nch,1,order])               
-        filt_a = np.tile(a_temp.reshape([2,1]),[nch,1,order]) 
-        filt_b[:,:,0] = filt_b[:,:,0]*gain
+        c1LP = (c / Hz - TWOPI * fc) / (c / Hz + TWOPI * fc)
+        c2LP = TWOPI * fc / Hz / (TWOPI * fc + c / Hz)
+
+        b_temp = np.array([c2LP, c2LP])
+        a_temp = np.array([1, -c1LP])
+
+        filt_b = np.tile(b_temp.reshape([2, 1]), [nch, 1, order])
+        filt_a = np.tile(a_temp.reshape([2, 1]), [nch, 1, order])
+        filt_b[:, :, 0] = filt_b[:, :, 0] * gain
 
         LinearFilterbank.__init__(self, source, filt_b, filt_a)
 
 
 class LowPass_filter(LinearFilterbank):
-    def __init__(self,source,cf,fc,gain,order):
+    def __init__(self, source, cf, fc, gain, order):
         nch = len(cf)
-        TWOPI = 2*pi
-        self.samplerate =  source.samplerate
+        TWOPI = 2 * pi
+        self.samplerate = source.samplerate
         c = 2.0 * self.samplerate
-        c1LP = ( c/Hz - TWOPI*fc ) 
-        
-        b_temp = np.array([1,1])/ ( c/Hz + TWOPI*fc )
-        a_temp = np.array([1,-c1LP/ ( c/Hz + TWOPI*fc )])
-        
-        filt_b = np.tile(b_temp.reshape([2,1]),[nch,1,order])               
-        filt_a = np.tile(a_temp.reshape([2,1]),[nch,1,order]) 
-        filt_b[:,:,order-1] = filt_b[:,:,order-1]*gain
+        c1LP = (c / Hz - TWOPI * fc)
+
+        b_temp = np.array([1, 1]) / (c / Hz + TWOPI * fc)
+        a_temp = np.array([1, -c1LP / (c / Hz + TWOPI * fc)])
+
+        filt_b = np.tile(b_temp.reshape([2, 1]), [nch, 1, order])
+        filt_a = np.tile(a_temp.reshape([2, 1]), [nch, 1, order])
+        filt_b[:, :, order - 1] = filt_b[:, :, order - 1] * gain
 
         LinearFilterbank.__init__(self, source, filt_b, filt_a)
 
 
-def saturation_fc(x,A0=1,B=1,C=1,D=1):
-    ind = x>=0
-    x[ind]=A0*np.log(x[ind]*B+1.0)   
-    ind = x<0
-    dtemp = (-x[ind])**C
-    tempA = -A0*(dtemp+D)/(3*dtemp+D)
-    x[ind]=tempA*np.log(abs(x[ind])*B+1.0)
+def saturation_fc(x, A0=1, B=1, C=1, D=1):
+    ind = x >= 0
+    x[ind] = A0 * np.log(x[ind] * B + 1.0)
+    ind = x < 0
+    dtemp = (-x[ind]) ** C
+    tempA = -A0 * (dtemp + D) / (3 * dtemp + D)
+    x[ind] = tempA * np.log(abs(x[ind]) * B + 1.0)
 
     return x
 
 
 class TanCarneyIHC(CombinedFilterbank):
-    
     def __init__(self, source, cf):
         CombinedFilterbank.__init__(self, source)
         source = self.get_modified_source()
-        
+
         ## Saturation
         saturation = FunctionFilterbank(source, saturation_fc,
                                         A0=0.1, B=2000, C=1.74, D=6.87e-9)
@@ -533,64 +532,65 @@ class TanCarneyIHC(CombinedFilterbank):
 class TanCarneyControl(CombinedFilterbank):
     def __init__(self, source, cf, update_interval, param=None):
         CombinedFilterbank.__init__(self, source)
-        source = self.get_modified_source()       
+        source = self.get_modified_source()
         cf = np.atleast_1d(cf)
-        samplerate=source.samplerate
+        samplerate = source.samplerate
         parameters = set_parameters(cf, param)
         ##### Control Path ####
         # band pass filter
         control_coef = Control_Coefficients(cf, samplerate)
-        [filt_b,filt_a] = control_coef.return_coefficients(np.zeros((1,len(cf))))        
-        BP_control = LinearFilterbank(source,filt_b,filt_a)
-                
-        # first non linearity of control path
-        Acp,Bcp,Ccp=100.,2.5,0.60 
-        func_NL1_control=lambda x:np.sign(x)*Bcp*np.log(1.+Acp*abs(x)**Ccp)
-        NL1_control=FunctionFilterbank(BP_control,func_NL1_control)
-                
-        # second non linearity of control path
-        asym,s0,x1,s1=7.,8.,5.,3. 
-        shift = 1./(1.+asym)
-        x0 = s0*np.log((1.0/shift-1)/(1+np.exp(x1/s1)))
-        func_NL2_control=lambda x:(1.0/(1.0+np.exp(-(x-x0)/s0)*(1.0+np.exp(-(x-x1)/s1)))-shift)*parameters['nlgain']
-        NL2_control=FunctionFilterbank(NL1_control,func_NL2_control)
+        [filt_b, filt_a] = control_coef.return_coefficients(np.zeros((1, len(cf))))
+        BP_control = LinearFilterbank(source, filt_b, filt_a)
 
-        #control low pass filter (its output will be used to control the signal path)
-        gain_lp_con = (2*pi*parameters['fc_LP_control'])**3*1.5
-        LP_control = LowPass_filter(NL2_control,cf,parameters['fc_LP_control'],gain_lp_con,3)   
-        #low pass filter for feedback to control band pass (its output will be used to control the control path)
-        gain_lp_fb = parameters['fc_LP_fb']*2*pi*10
-        LP_feed_back = LowPass_filter(LP_control,cf,parameters['fc_LP_fb'],gain_lp_fb,1)
-        
-        updater = Filter_Update(BP_control, control_coef) #instantiation of the updater for the control path
+        # first non linearity of control path
+        Acp, Bcp, Ccp = 100., 2.5, 0.60
+        func_NL1_control = lambda x: np.sign(x) * Bcp * np.log(1. + Acp * abs(x) ** Ccp)
+        NL1_control = FunctionFilterbank(BP_control, func_NL1_control)
+
+        # second non linearity of control path
+        asym, s0, x1, s1 = 7., 8., 5., 3.
+        shift = 1. / (1. + asym)
+        x0 = s0 * np.log((1.0 / shift - 1) / (1 + np.exp(x1 / s1)))
+        func_NL2_control = lambda x: (1.0 / (1.0 + np.exp(-(x - x0) / s0) * (1.0 + np.exp(-(x - x1) / s1))) - shift) * \
+                                     parameters['nlgain']
+        NL2_control = FunctionFilterbank(NL1_control, func_NL2_control)
+
+        # control low pass filter (its output will be used to control the signal path)
+        gain_lp_con = (2 * pi * parameters['fc_LP_control']) ** 3 * 1.5
+        LP_control = LowPass_filter(NL2_control, cf, parameters['fc_LP_control'], gain_lp_con, 3)
+        # low pass filter for feedback to control band pass (its output will be used to control the control path)
+        gain_lp_fb = parameters['fc_LP_fb'] * 2 * pi * 10
+        LP_feed_back = LowPass_filter(LP_control, cf, parameters['fc_LP_fb'], gain_lp_fb, 1)
+
+        updater = Filter_Update(BP_control, control_coef)  # instantiation of the updater for the control path
         output = ControlFilterbank(LP_control, LP_feed_back, BP_control,
-                                   updater, update_interval)  #controler for the band pass filter of the control path
-                 
+                                   updater, update_interval)  # controler for the band pass filter of the control path
+
         self.set_output(output)
 
 
-class TanCarneySignal(CombinedFilterbank):    
+class TanCarneySignal(CombinedFilterbank):
     def __init__(self, source, cf, update_interval, param=None):
 
         CombinedFilterbank.__init__(self, source)
-        source = self.get_modified_source()       
+        source = self.get_modified_source()
         cf = np.atleast_1d(cf)
         parameters = set_parameters(cf, param)
-        samplerate=source.samplerate
+        samplerate = source.samplerate
 
-        if int(source.samplerate)!=50000:
+        if int(source.samplerate) != 50000:
             warnings.warn('To use the TanCarney cochlear model the sample rate should be 50kHz')
-        
+
         # band pass filter
-        signal_coef = Signal_Coefficients(cf, samplerate,parameters)
-        [filt_b,filt_a] = signal_coef.return_coefficients(np.zeros((1,len(cf))))
-        BP_signal = LinearFilterbank(source,filt_b,filt_a)
-        
+        signal_coef = Signal_Coefficients(cf, samplerate, parameters)
+        [filt_b, filt_a] = signal_coef.return_coefficients(np.zeros((1, len(cf))))
+        BP_signal = LinearFilterbank(source, filt_b, filt_a)
+
         control_output = TanCarneyControl(source, cf, update_interval, parameters)
-        
-        updater = Filter_Update(BP_signal, signal_coef) #instantiation of the updater for the signal path
+
+        updater = Filter_Update(BP_signal, signal_coef)  # instantiation of the updater for the signal path
         output = ControlFilterbank(BP_signal, control_output, BP_signal,
-                                   updater, update_interval)  #controler for the band pass filter of the signal path
+                                   updater, update_interval)  # controler for the band pass filter of the signal path
 
         self.set_output(output)
 
@@ -623,15 +623,15 @@ class TanCarney(CombinedFilterbank):
         Dictionary used to overwrite the default parameters given in the
         original paper. 
     '''
-        
+
     def __init__(self, source, cf, update_interval=1, param=None):
         CombinedFilterbank.__init__(self, source)
-        source = self.get_modified_source()       
+        source = self.get_modified_source()
         cf = np.atleast_1d(cf)
 
-        parameters=set_parameters(cf,param)        
-        
+        parameters = set_parameters(cf, param)
+
         signal = TanCarneySignal(source, cf, update_interval, parameters)
         ihc = TanCarneyIHC(signal, cf)
-        
+
         self.set_output(ihc)

@@ -1,4 +1,4 @@
-from brian import *
+from brian2 import *
 from hears.filtering.filterbank import Filterbank,FunctionFilterbank,ControlFilterbank, CombinedFilterbank
 from hears.filtering.filterbanklibrary import *
 from hears.filtering.linearfilterbank import *

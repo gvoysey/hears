@@ -1,7 +1,8 @@
-from brian import *
+from brian2 import *
 from hears.sounds import Sound
 from hears.filtering import FIRFilterbank
 from copy import copy
+from six.moves import xrange
 
 __all__ = ['HRTF', 'HRTFSet', 'HRTFDatabase',
            'make_coordinates']
