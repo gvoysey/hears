@@ -6,7 +6,7 @@ import warnings
 from brian2 import Clock, Hz, ms, NeuronGroup, network_operation
 
 from brian2 import PoissonThreshold
-from brian2.reset import CustomRefractoriness
+from brian2 import CustomRefractoriness
 
 
 from hears.filtering.filterbank import (FunctionFilterbank,
