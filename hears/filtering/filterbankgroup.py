@@ -1,9 +1,10 @@
-from brian import StateUpdater, NeuronGroup, Equations, Clock, network_operation
+from brian2 import NeuronGroup, Clock, network_operation
 
 __all__ = ['FilterbankGroup']
 
+
 class FilterbankGroup(NeuronGroup):
-    '''
+    """
     Allows a Filterbank object to be used as a NeuronGroup
     
     Initialised as a standard :class:`NeuronGroup` object, but with two
@@ -29,43 +30,43 @@ class FilterbankGroup(NeuronGroup):
         
     Note that if you specify your own :class:`Clock`, it should have
     1/dt=samplerate.
-    '''
-    
+    """
+
     def __init__(self, filterbank, targetvar, *args, **kwds):
         self.targetvar = targetvar
         self.filterbank = filterbank
         filterbank.buffer_init()
 
         # update level keyword
-        kwds['level'] = kwds.get('level', 0)+1
-    
+        kwds['level'] = kwds.get('level', 0) + 1
+
         # Sanitize the clock - does it have the right dt value?
         if 'clock' in kwds:
-            if int(1/kwds['clock'].dt)!=int(filterbank.samplerate):
+            if int(1 / kwds['clock'].dt) != int(filterbank.samplerate):
                 raise ValueError('Clock should have 1/dt=samplerate')
         else:
-            kwds['clock'] = Clock(dt=1/filterbank.samplerate)        
-        
+            kwds['clock'] = Clock(dt=1 / filterbank.samplerate)
+
         buffersize = kwds.pop('buffersize', 32)
         if not isinstance(buffersize, int):
-            buffersize = int(buffersize*self.samplerate)
+            buffersize = int(buffersize * self.samplerate)
         self.buffersize = buffersize
         self.buffer_pointer = buffersize
         self.buffer_start = -buffersize
-        
+
         NeuronGroup.__init__(self, filterbank.nchannels, *args, **kwds)
-        
+
         @network_operation(when='start', clock=self.clock)
         def apply_filterbank_output():
-            if self.buffer_pointer>=self.buffersize:
+            if self.buffer_pointer >= self.buffersize:
                 self.buffer_pointer = 0
                 self.buffer_start += self.buffersize
-                self.buffer = self.filterbank.buffer_fetch(self.buffer_start, self.buffer_start+self.buffersize)
+                self.buffer = self.filterbank.buffer_fetch(self.buffer_start, self.buffer_start + self.buffersize)
             setattr(self, targetvar, self.buffer[self.buffer_pointer, :])
             self.buffer_pointer += 1
-        
+
         self.contained_objects.append(apply_filterbank_output)
-        
+
     def reinit(self):
         NeuronGroup.reinit(self)
         self.filterbank.buffer_init()
